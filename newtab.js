@@ -266,45 +266,46 @@ function autoGrow(textarea) {
     textarea.style.height = textarea.scrollHeight + 'px';
 }
 
-function getGreeting() {
+function getGreeting(name) {
     const date = new Date();
     const hour = date.getHours();
     const day = date.getDay();
+    const n = name ? `, ${name}` : '';
 
     if (Math.random() < 0.2) {
-        const generics = ['Welcome, Teja!', 'What’s on your mind, Teja?'];
+        const generics = [`Welcome${n}!`, `What's on your mind${n}?`];
         return generics[Math.floor(Math.random() * generics.length)];
     }
 
     const greetings = [];
 
     if (hour >= 5 && hour < 12) {
-        greetings.push('Good morning, Teja!');
+        greetings.push(`Good morning${n}!`);
     } else if (hour >= 12 && hour < 18) {
-        greetings.push('Good afternoon, Teja!');
+        greetings.push(`Good afternoon${n}!`);
     } else if (hour >= 18 && hour < 20) {
-        greetings.push('Good evening, Teja!', 'Evening, Teja!');
+        greetings.push(`Good evening${n}!`, `Evening${n}!`);
     } else if (hour >= 23) {
         greetings.push('Hello, night owl!');
     } else {
-        greetings.push('Good night, Teja!');
+        greetings.push(`Good night${n}!`);
     }
 
-    if (day === 1 && hour < 16) greetings.push('Happy Monday, Teja!');
-    else if (day === 2) greetings.push('Happy Tuesday, Teja!');
-    else if (day === 5 && hour < 16) greetings.push('Happy Friday, Teja!');
-    else if (day === 5 && hour >= 16) greetings.push('Happy Weekend, Teja!');
-    else if (day === 0 || day === 6) greetings.push('Happy Weekend, Teja!');
+    if (day === 1 && hour < 16) greetings.push(`Happy Monday${n}!`);
+    else if (day === 2) greetings.push(`Happy Tuesday${n}!`);
+    else if (day === 5 && hour < 16) greetings.push(`Happy Friday${n}!`);
+    else if (day === 5 && hour >= 16) greetings.push(`Happy Weekend${n}!`);
+    else if (day === 0 || day === 6) greetings.push(`Happy Weekend${n}!`);
 
     return greetings[Math.floor(Math.random() * greetings.length)];
 }
 
-function renderGreeting() {
+function renderGreeting(name) {
     const greetingText = document.getElementById('greetingText');
     if (!greetingText) {
         return;
     }
-    greetingText.textContent = getGreeting();
+    greetingText.textContent = getGreeting(name);
 }
 
 async function loadSavedEngine() {
@@ -319,8 +320,45 @@ async function loadSavedEngine() {
     }
 }
 
+function showNamePrompt(onSave) {
+    const prompt = document.getElementById('namePrompt');
+    const input = document.getElementById('namePromptInput');
+    if (!prompt || !input) return;
+
+    prompt.style.display = 'block';
+    setTimeout(() => input.focus(), 50);
+
+    input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+            const name = input.value.trim();
+            if (!name) return;
+            try { await chrome.storage.sync.set({ userName: name }); } catch {}
+            prompt.style.display = 'none';
+            onSave(name);
+            document.getElementById('searchInput')?.focus();
+        } else if (e.key === 'Escape') {
+            prompt.style.display = 'none';
+            document.getElementById('searchInput')?.focus();
+        }
+    });
+}
+
 async function init() {
-    renderGreeting();
+    let userName = '';
+    try {
+        const result = await chrome.storage.sync.get(['userName']);
+        userName = result.userName || '';
+    } catch {
+        // storage not available — render without name
+    }
+
+    if (userName) {
+        renderGreeting(userName);
+    } else {
+        renderGreeting('');
+        showNamePrompt((name) => renderGreeting(name));
+    }
+
     await loadSavedEngine();
     renderEngines();
     applyEngineTheme(getActiveEngine());

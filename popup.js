@@ -179,7 +179,29 @@ class DomainBlocker {
     }
 }
 
-// Initialize the domain blocker when the popup loads
 document.addEventListener('DOMContentLoaded', () => {
     new DomainBlocker();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('nameInput');
+    const saveButton = document.getElementById('saveNameButton');
+    const feedback = document.getElementById('nameFeedback');
+    if (!nameInput || !saveButton) return;
+
+    chrome.storage.sync.get(['userName'], (result) => {
+        nameInput.value = result.userName || '';
+    });
+
+    saveButton.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        chrome.storage.sync.set({ userName: name }, () => {
+            feedback.textContent = 'Saved!';
+            setTimeout(() => { feedback.textContent = ''; }, 1500);
+        });
+    });
+
+    nameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveButton.click();
+    });
 });
