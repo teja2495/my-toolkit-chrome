@@ -64,6 +64,36 @@ html, body {
     -webkit-user-select: none;
 }
 
+.name-prompt {
+    display: none;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.name-prompt-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    padding: 4px 8px;
+    outline: none;
+    text-align: center;
+    width: 240px;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.name-prompt-input::placeholder {
+    color: var(--text-muted);
+}
+
+.name-prompt-input:focus {
+    border-bottom-color: var(--accent-warm);
+    color: var(--text-primary);
+}
+
 .search-box {
     --search-line: 1.45;
     --search-font: 20px;
