@@ -8,7 +8,7 @@
         "default_title": "Toolkit"
     },
     "chrome_url_overrides": {
-        "newtab": "newtab.html"
+        "newtab": "features/new-tab/ui/newtab.html"
     },
     "content_scripts": [
         {
@@ -16,12 +16,11 @@
                 "*://www.youtube.com/*"
             ],
             "js": [
-                "youtube-player-buttons.js",
-                "youtube-watch-t-keypress.js",
-                "youtube-playlist-buttons.js",
-                "yt-music-playlist-filtering.js",
-                "youtube-topbar-buttons.js",
-                "youtube-homepage-watch-later.js"
+                "features/youtube/youtube-player-buttons.js",
+                "features/youtube/youtube-watch-t-keypress.js",
+                "features/youtube/youtube-playlist-buttons.js",
+                "features/youtube/yt-music-playlist-filtering.js",
+                "features/youtube/youtube-homepage-watch-later.js"
             ],
             "run_at": "document_idle"
         },
@@ -30,7 +29,7 @@
                 "<all_urls>"
             ],
             "js": [
-                "domain-blocker.js"
+                "features/domain-blocker/domain-blocker.js"
             ],
             "run_at": "document_start"
         },
@@ -40,7 +39,7 @@
                 "*://www.x.com/*"
             ],
             "js": [
-                "text-selection-popup.js"
+                "features/x-text-selection/text-selection-popup.js"
             ],
             "run_at": "document_idle"
         },
@@ -50,7 +49,7 @@
                 "*://claude.com/*"
             ],
             "js": [
-                "claude-input.js"
+                "features/utility/claude-input.js"
             ],
             "run_at": "document_idle"
         },
@@ -59,7 +58,7 @@
                 "*://gemini.google.com/*"
             ],
             "js": [
-                "gemini-input.js"
+                "features/utility/gemini-input.js"
             ],
             "run_at": "document_idle"
         },
@@ -69,7 +68,7 @@
                 "*://chat.openai.com/*"
             ],
             "js": [
-                "chatgpt-input.js"
+                "features/utility/chatgpt-input.js"
             ],
             "run_at": "document_idle"
         }
@@ -90,7 +89,7 @@
         "bookmarks"
     ],
     "background": {
-        "service_worker": "custom-context-menu-actions.js"
+        "service_worker": "features/close-other-tabs/custom-context-menu-actions.js"
     },
     "commands": {
         "close-other-tabs-shortcut": {
