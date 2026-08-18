@@ -3,6 +3,7 @@
   const MINI_FEATURE_ATTRIBUTE = "data-toolkit-youtube-mini-sidebar";
   const guideSelector = "#guide ytd-guide-renderer #sections";
   const miniGuideSelector = "ytd-mini-guide-renderer #items";
+  let collapsedGuideOnLoad = false;
 
   const miniGuideEntries = [
     ["Home", "https://www.youtube.com/", "M3 9.6 12 3l9 6.6V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.6Z"],
@@ -65,11 +66,35 @@
     return icon;
   }
 
+  function selectPodcastsFilter() {
+    const podcastsButton = [...document.querySelectorAll("yt-chip-cloud-chip-renderer button[role='tab']")]
+      .find((button) => button.textContent.trim() === "Podcasts");
+    podcastsButton?.click();
+  }
+
+  function collapseGuideOnLoad() {
+    if (collapsedGuideOnLoad) return;
+
+    const guide = document.querySelector("tp-yt-app-drawer#guide[opened]");
+    const guideButton = document.querySelector("ytd-app #guide-button #button[aria-pressed='true']");
+    if (!guide || !guideButton) return;
+
+    collapsedGuideOnLoad = true;
+    guideButton.click();
+  }
+
   function makeEntry(label, url, iconPath) {
     const entry = document.createElement("a");
     entry.className = "toolkit-youtube-sidebar-entry";
     entry.href = url;
     entry.title = label;
+
+    if (label === "Podcasts") {
+      entry.addEventListener("click", (event) => {
+        event.preventDefault();
+        selectPodcastsFilter();
+      });
+    }
 
     if (iconPath) {
       const icon = makeIcon(iconPath);
@@ -133,6 +158,13 @@
         entry.href = url;
         entry.title = label;
         entry.setAttribute("aria-label", label);
+
+        if (label === "Podcasts") {
+          entry.addEventListener("click", (event) => {
+            event.preventDefault();
+            selectPodcastsFilter();
+          });
+        }
 
         const icon = makeIcon(path);
 
@@ -235,6 +267,7 @@
 
   buildSidebar();
   buildMiniSidebar();
+  collapseGuideOnLoad();
   document.addEventListener("yt-navigate-finish", () => {
     updateSelectedEntry();
     updateMiniSelectedEntry();
@@ -242,5 +275,6 @@
   new MutationObserver(() => {
     buildSidebar();
     buildMiniSidebar();
+    collapseGuideOnLoad();
   }).observe(document.documentElement, { childList: true, subtree: true });
 })();
