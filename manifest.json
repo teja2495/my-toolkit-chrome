@@ -20,7 +20,8 @@
                 "features/youtube/youtube-watch-t-keypress.js",
                 "features/youtube/youtube-playlist-buttons.js",
                 "features/youtube/yt-music-playlist-filtering.js",
-                "features/youtube/youtube-homepage-watch-later.js"
+                "features/youtube/youtube-homepage-watch-later.js",
+                "features/youtube-sidebar/youtube-sidebar.js"
             ],
             "run_at": "document_idle"
         },
