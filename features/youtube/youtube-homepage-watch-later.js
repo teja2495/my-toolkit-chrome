@@ -89,19 +89,40 @@
         // Click the menu button
         menuButton.click();
 
-        // Wait for menu to appear and then click "Save to Watch Later"
+        const isVisible = (element) => {
+            const style = window.getComputedStyle(element);
+            return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+        };
+
+        const normalizedText = (element) => (element.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+        const clickWatchLaterInSaveDialog = (attempt = 1) => {
+            const saveDialog = [...document.querySelectorAll('ytd-add-to-playlist-renderer, yt-sheet-view-model')]
+                .find((dialog) => isVisible(dialog) && normalizedText(dialog).includes('watch later'));
+            if (!saveDialog) {
+                if (attempt < 5) setTimeout(() => clickWatchLaterInSaveDialog(attempt + 1), 200);
+                return;
+            }
+
+            const watchLaterRow = [...saveDialog.querySelectorAll('ytd-playlist-add-to-option-renderer, [role="checkbox"], yt-list-item-view-model')]
+                .find((item) => normalizedText(item).includes('watch later'));
+            if (!watchLaterRow) {
+                if (attempt < 5) setTimeout(() => clickWatchLaterInSaveDialog(attempt + 1), 200);
+                return;
+            }
+
+            const checkbox = watchLaterRow.matches('[role="checkbox"]')
+                ? watchLaterRow
+                : watchLaterRow.querySelector('[role="checkbox"], #checkbox');
+            if (!checkbox || checkbox.getAttribute('aria-checked') !== 'true') {
+                (checkbox || watchLaterRow).click();
+            }
+        };
+
+        // Wait for the card's visible menu, then select its save action.
         const tryClickWatchLater = (attempt = 1) => {
-            // Try multiple selectors for the menu - prioritize the correct menu
-            let menu = document.querySelector('ytd-menu-popup-renderer');
-            if (!menu) {
-                menu = document.querySelector('yt-sheet-view-model');
-            }
-            if (!menu) {
-                menu = document.querySelector('ytd-menu-renderer');
-            }
-            if (!menu) {
-                menu = document.querySelector('[role="menu"]');
-            }
+            const menu = [...document.querySelectorAll('ytd-menu-popup-renderer, yt-sheet-view-model, ytd-menu-renderer, [role="menu"]')]
+                .find((candidate) => isVisible(candidate) && normalizedText(candidate).includes('save'));
             
             if (!menu) {
                 if (attempt < 5) {
@@ -110,10 +131,10 @@
                 return;
             }
             
-            // Check if this is the right menu by looking for video-specific options
-            const menuText = menu.textContent || '';
+            // Check that this is the active video menu, not another menu retained in the DOM.
+            const menuText = normalizedText(menu);
             
-            if (!menuText.includes('Save to Watch later') && !menuText.includes('Add to queue')) {
+            if (!menuText.includes('save to watch later') && !menuText.includes('save to playlist')) {
                 if (attempt < 5) {
                     setTimeout(() => tryClickWatchLater(attempt + 1), 200);
                 }
@@ -130,7 +151,7 @@
                 const item = listItems[i];
                 const titleSpan = item.querySelector('span.yt-core-attributed-string.yt-list-item-view-model__title');
                 
-                if (titleSpan && titleSpan.textContent.includes('Save to Watch later')) {
+                if (titleSpan && normalizedText(titleSpan).includes('save to watch later')) {
                     watchLaterOption = item;
                     break;
                 }
@@ -139,7 +160,7 @@
             // Strategy 2: Look for the specific span with exact classes
             if (!watchLaterOption) {
                 watchLaterOption = menu.querySelector('span.yt-core-attributed-string.yt-list-item-view-model__title');
-                if (watchLaterOption && watchLaterOption.textContent.includes('Save to Watch later')) {
+                if (watchLaterOption && normalizedText(watchLaterOption).includes('save to watch later')) {
                     // Found the span, find its parent menu item
                     watchLaterOption = watchLaterOption.closest('yt-list-item-view-model[role="menuitem"]');
                 }
@@ -149,12 +170,15 @@
             if (!watchLaterOption) {
                 const allElements = menu.querySelectorAll('*');
                 for (let element of allElements) {
-                    if (element.textContent && element.textContent.includes('Save to Watch later')) {
-                        watchLaterOption = element.closest('yt-list-item-view-model[role="menuitem"]');
+                    if (normalizedText(element).includes('save to watch later')) {
+                        watchLaterOption = element.closest('yt-list-item-view-model[role="menuitem"], ytd-menu-service-item-renderer, [role="menuitem"]');
                         if (watchLaterOption) break;
                     }
                 }
             }
+
+            const saveToPlaylistOption = [...menu.querySelectorAll('yt-list-item-view-model[role="menuitem"], ytd-menu-service-item-renderer, [role="menuitem"]')]
+                .find((item) => normalizedText(item).includes('save to playlist'));
 
             if (watchLaterOption) {
                 // Try multiple click methods
@@ -166,6 +190,9 @@
                     watchLaterOption.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
                     watchLaterOption.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
                 }
+            } else if (saveToPlaylistOption) {
+                saveToPlaylistOption.click();
+                clickWatchLaterInSaveDialog();
             } else {
                 // Try again after a short delay
                 if (attempt < 5) {

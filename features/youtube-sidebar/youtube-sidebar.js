@@ -257,7 +257,7 @@
     .toolkit-youtube-sidebar-entry-selected .toolkit-youtube-sidebar-title { font-weight: 700; }
     .toolkit-youtube-sidebar-heading { background: transparent; border: 0; box-sizing: border-box; color: rgba(241, 241, 241, 0.72) !important; cursor: pointer; display: block; font-family: Roboto, Arial, sans-serif; font-size: 14px; font-weight: 400; line-height: 22px; margin: 0; padding: 0 24px 8px; text-align: center; width: 100%; }
     .toolkit-youtube-mini-items { display: block; }
-    .toolkit-youtube-mini-entry { align-items: center; border-radius: 10px; box-sizing: border-box; color: #f1f1f1; display: flex; flex-direction: column; font-family: Roboto, Arial, sans-serif; font-size: 10px; gap: 5px; height: 74px; justify-content: center; margin: 0 6px; text-align: center; text-decoration: none; }
+    .toolkit-youtube-mini-entry { align-items: center; border-radius: 10px; box-sizing: border-box; color: #f1f1f1; display: flex; flex-direction: column; font-family: Roboto, Arial, sans-serif; font-size: 10px; gap: 5px; height: 74px; justify-content: center; margin: 0 6px 8px; text-align: center; text-decoration: none; }
     .toolkit-youtube-mini-entry:hover, .toolkit-youtube-mini-entry-selected { background-color: rgba(255, 255, 255, 0.1); }
     .toolkit-youtube-mini-entry-selected { font-weight: 700; }
     .toolkit-youtube-mini-entry svg { fill: currentColor; height: 24px; width: 24px; }
