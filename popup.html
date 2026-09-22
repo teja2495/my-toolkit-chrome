@@ -170,6 +170,12 @@
         .action-button:hover {
             background: #353b44;
         }
+
+        .setting-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: #4CAF50;
+        }
         
         
         .domain-list {
@@ -237,6 +243,13 @@
             <div class="domain-list" id="domainList">
                 <div class="empty-state">No domains blocked yet</div>
             </div>
+        </div>
+    </div>
+
+    <div class="setting-section">
+        <div class="toggle-container">
+            <label class="toggle-label" for="allowPasswordPaste">Allow paste in password fields</label>
+            <input class="setting-checkbox" type="checkbox" id="allowPasswordPaste">
         </div>
     </div>
 

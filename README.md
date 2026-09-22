@@ -23,6 +23,9 @@ A minimal new-tab page ([newtab.html](features/new-tab/ui/newtab.html)) with:
 ### Domain Blocker
 Block time-wasting domains with a built-in cool-down. Toggle on/off and manage the list from the extension popup ([popup.html](popup.html)). When you hit a blocked domain it shows a countdown overlay before letting you through (configurable in [domain-blocker.js](features/domain-blocker/domain-blocker.js)).
 
+### Allow Paste in Password Fields
+The extension lets the browser's normal paste action work in password inputs, even when a page cancels paste events. This is enabled by default and can be turned off from the extension popup. It does not read clipboard contents or password values.
+
 ### "Close Other Tabs" Shortcut + Context Menu
 - Right-click anywhere → **Close Other Tabs** (keeps the current tab and any pinned tabs).
 - Keyboard shortcut: `Cmd/Ctrl + Shift + Y`.

@@ -6,6 +6,7 @@ class DomainBlocker {
         this.domainList = document.getElementById('domainList');
         this.domainSection = document.getElementById('domainSection');
         this.domainControls = document.getElementById('domainControls');
+        this.allowPasswordPaste = document.getElementById('allowPasswordPaste');
         this.init();
     }
     
@@ -19,6 +20,14 @@ class DomainBlocker {
         
         // Load blocked domains
         await this.loadBlockedDomains();
+
+        const pasteSettingKey = 'allowPasswordPaste.enabled';
+        chrome.storage.sync.get({ [pasteSettingKey]: true }, (result) => {
+            this.allowPasswordPaste.checked = result[pasteSettingKey] !== false;
+        });
+        this.allowPasswordPaste.addEventListener('change', () => {
+            chrome.storage.sync.set({ [pasteSettingKey]: this.allowPasswordPaste.checked });
+        });
         
         // Add event listeners
         this.toggle.addEventListener('click', () => this.toggleFeature());

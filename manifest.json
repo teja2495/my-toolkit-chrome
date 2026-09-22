@@ -36,6 +36,16 @@
         },
         {
             "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "features/allow-password-paste/allow-password-paste.js"
+            ],
+            "run_at": "document_start",
+            "all_frames": true
+        },
+        {
+            "matches": [
                 "*://x.com/*",
                 "*://www.x.com/*"
             ],
