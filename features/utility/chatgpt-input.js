@@ -35,7 +35,24 @@
             if (isUsablePrompt(inner)) return inner;
         }
 
+        // Fallbacks in case ChatGPT changes composer markup.
+        const fallbacks = [
+            'form .ProseMirror[contenteditable]:not([contenteditable="false"])',
+            'textarea[name="prompt-textarea"]',
+            'form [contenteditable="true"]',
+            'form textarea',
+        ];
+        for (const sel of fallbacks) {
+            const el = document.querySelector(sel);
+            if (isUsablePrompt(el)) return el;
+        }
+
         return null;
+    }
+
+    function getInputText(el) {
+        if (!el) return '';
+        return (el.tagName === 'TEXTAREA' ? el.value : el.innerText) || '';
     }
 
     function insertTextIntoInput(inputEl, text) {
@@ -64,9 +81,10 @@
     function clickSubmitButton(attempt = 0) {
         const button =
             document.querySelector('#composer-submit-button') ||
-            document.querySelector('button[data-testid="send-button"]');
+            document.querySelector('button[data-testid="send-button"]') ||
+            document.querySelector('form button[aria-label*="Send" i]');
         const inputEl = findInputElement();
-        const hasPromptText = inputEl && inputEl.innerText.trim();
+        const hasPromptText = getInputText(inputEl).trim();
 
         if (
             button &&
@@ -78,29 +96,63 @@
             return;
         }
 
-        if (attempt < 25) {
-            setTimeout(() => clickSubmitButton(attempt + 1), 200);
+        // No send button at all: don't wait, just press Enter.
+        if (!button && hasPromptText && attempt >= 2) {
+            pressEnter(inputEl);
+            return;
         }
+
+        if (attempt < 20) {
+            setTimeout(() => clickSubmitButton(attempt + 1), 100);
+            return;
+        }
+
+        // Send button never became clickable: fall back to Enter.
+        if (inputEl && hasPromptText) pressEnter(inputEl);
+    }
+
+    function pressEnter(inputEl) {
+        const opts = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true };
+        inputEl.dispatchEvent(new KeyboardEvent('keydown', opts));
+        inputEl.dispatchEvent(new KeyboardEvent('keyup', opts));
     }
 
     function getPromptFromUrl() {
         return new URLSearchParams(window.location.search).get('prompt')?.trim() || '';
     }
 
-    function tryInsert(text, attempt = 0) {
-        const inputEl = findInputElement();
+    function textLanded(text) {
+        const probe = text.slice(-30).trim().replace(/\s+/g, ' ');
+        const current = getInputText(findInputElement()).replace(/\s+/g, ' ');
+        return !!probe && current.includes(probe);
+    }
 
-        if (inputEl) {
-            requestAnimationFrame(() => {
-                insertTextIntoInput(inputEl, text);
-                setTimeout(() => clickSubmitButton(), 700);
-            });
+    // ChatGPT can re-render the composer during hydration and wipe inserted
+    // text, so verify it stuck before clearing storage and submitting.
+    function tryInsert(text, attempt = 0) {
+        const retry = () => {
+            if (attempt < MAX_RETRIES) {
+                setTimeout(() => tryInsert(text, attempt + 1), RETRY_INTERVAL_MS);
+            }
+        };
+
+        const inputEl = findInputElement();
+        if (!inputEl) {
+            retry();
             return;
         }
 
-        if (attempt < MAX_RETRIES) {
-            setTimeout(() => tryInsert(text, attempt + 1), RETRY_INTERVAL_MS);
-        }
+        requestAnimationFrame(() => {
+            if (!textLanded(text)) insertTextIntoInput(inputEl, text);
+            setTimeout(() => {
+                if (!textLanded(text)) {
+                    retry();
+                    return;
+                }
+                chrome.storage.local.remove(PENDING_TEXT_KEY);
+                clickSubmitButton();
+            }, 150);
+        });
     }
 
     const PREFIX_TEXT =
@@ -116,7 +168,6 @@
             return;
         }
 
-        await chrome.storage.local.remove(PENDING_TEXT_KEY);
         tryInsert(PREFIX_TEXT + text);
     }
 
