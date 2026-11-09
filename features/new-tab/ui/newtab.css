@@ -232,6 +232,11 @@ html, body {
     border-color: var(--border-strong);
 }
 
+.engine-cell.is-active,
+.engine-cell.is-active:hover {
+    border-color: color-mix(in srgb, var(--text-muted) 55%, var(--border-strong));
+}
+
 .engine-btn {
     flex: 1;
     min-width: 0;

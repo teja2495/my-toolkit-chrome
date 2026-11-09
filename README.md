@@ -14,8 +14,8 @@ It's a grab-bag, not a polished product — each feature is a standalone content
 
 ### Custom New Tab Page
 A minimal new-tab page ([newtab.html](features/new-tab/ui/newtab.html)) with:
-- A search box that supports multiple engines (Google, Perplexity, ChatGPT, Claude, Gemini, YouTube, Google AI Mode, Grok, Amazon, Google Maps, Reddit).
-- Type a short alias prefix (e.g. `ppx ` for Perplexity, `gpt ` for ChatGPT, `amz ` for Amazon) to route the query to a specific engine.
+- A search box that supports multiple engines (Google, ChatGPT, Claude, Google Maps).
+- Type a short alias prefix (e.g. `gpt ` for ChatGPT, `cld ` for Claude, `mps ` for Google Maps) to route the query to a specific engine.
 - Inline bookmark search — start typing and matching bookmarks show up below the search box.
 - One-click "Close Other Tabs" and "Manage Extensions" buttons.
 - A friendly greeting at the top.
