@@ -56,6 +56,18 @@
         },
         {
             "matches": [
+                "*://x.com/*",
+                "*://www.x.com/*",
+                "*://twitter.com/*",
+                "*://www.twitter.com/*"
+            ],
+            "js": [
+                "features/x-feed-return/content-script.js"
+            ],
+            "run_at": "document_start"
+        },
+        {
+            "matches": [
                 "*://claude.ai/*",
                 "*://claude.com/*"
             ],
