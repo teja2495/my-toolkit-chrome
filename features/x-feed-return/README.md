@@ -1,20 +1,21 @@
 # X feed return
 
-Remembers the post around the middle of the viewport on X/Twitter timelines, independent of mouse position. If the feed unexpectedly removes that post or shifts it substantially, a dismissible banner offers: **Go back to the post you previously looked at**.
+When X refreshes a timeline and removes or moves the post being viewed, shows **See posts that appeared before refresh** above the first post of the refreshed feed. Clicking opens a popup with the text, author handle, and permalink for the previous feed's first three posts, in feed order. Links open in new tabs. If fewer than three posts were loaded, shows those available; media-only posts show a fallback message. Images, videos, and full threads are not archived.
 
-Clicking returns to the post's previous position when it is still rendered. If X has discarded it, clicking opens its permalink in the same tab. This recovers the post, not X's previous feed ordering. The first lost post stays available until the banner is used, dismissed, or the user navigates away.
+The first three posts are cached before refresh and retained even when X virtualizes them out of the DOM during scrolling. The central visible post is tracked for unexpected feed movement, independent of mouse position. Home and selected timeline-tab clicks capture the old snapshot before X handles the refresh. The observer watches inserted/removed posts and virtualized cell transforms. A newer detected refresh replaces the popup's previous snapshot.
 
-Normal wheel, touch, keyboard, and scrollbar scrolling are ignored. Timeline tab changes and navigation reset tracking. A short-lived permalink in per-tab session storage also allows recovery after a reload within five minutes. No tweet text is stored and no requests or new permissions are needed.
+The banner is inserted into the new first post's cell in normal document flow. It scrolls with that post, rather than floating over the viewport. If X temporarily removes that cell, the banner reattaches when the same post renders again. The popup closes with its close button, Escape, or a click outside it. Closing the popup retains the banner; switching timeline tabs or navigating away clears both.
 
-Home and selected timeline-tab clicks capture the reading target before X handles the refresh, preserving it through intermediate renders for up to 15 seconds. Passive DOM updates preserve the original position rather than continually replacing it. The observer watches X's virtualized cell transforms as well as inserted/removed posts. Promoted posts without timestamps use their analytics permalink when available.
+Up to three text previews and permalinks are saved in per-tab session storage to support page-reload recovery within five minutes. They are overwritten by the next feed snapshot. No network requests, external services, or new extension permissions are needed.
 
-Detection is heuristic: it depends on X's tweet markup, may miss a post replaced before the first scan (100 ms), and may interpret a large layout shift as a feed jump. Changes during active scrolling are intentionally ignored. It does not recover posts from before the extension was loaded.
+Detection is heuristic and depends on X's markup. It may miss a post replaced before the first scan (100 ms), ignore a refresh during active scrolling, or interpret a large layout shift as a refresh. It cannot recover content that was never loaded while the extension was running.
 
 ## Manual checks
 
-1. Reload Toolkit at `chrome://extensions`, then refresh X.
-2. On Home, scroll until a recognizable post is near the middle of the window, then stop for two seconds. Click the Home navigation icon again to refresh/jump to the top. If the old post moves away or disappears, check that the banner appears and returns to that exact post. Ordinary Home clicks do not suppress detection; a temporarily missing timeline tab bar also preserves the remembered post.
-3. When a jump leaves the post loaded farther down, click the banner and check that it scrolls back.
-4. Scroll with wheel, keyboard, touch, and scrollbar; normal scrolling should not show the banner.
-5. Dismiss with the close button or Escape. Switch between For you / Following or open a post; the old banner should clear.
-6. Pause on a post, reload the page, and check recovery when X shows a different post. Check keyboard focus and a narrow window.
+1. Reload Toolkit at `chrome://extensions`, then refresh X. Note the first three posts.
+2. After the feed settles, click Home again. When the feed changes, check that **See posts that appeared before refresh** appears above the first new tweet.
+3. Open the banner. Check the previous three posts' text, order, and links. A link should open that post in a new tab, leaving the popup available when you return.
+4. Close the popup using its close button, Escape, and the backdrop. Reopen from the banner. Dismiss the banner separately.
+5. Scroll normally; check that it does not trigger recovery. After scrolling down, click Home and verify that the original first three posts remain available.
+6. Repeat a refresh after the feed settles. Check that the popup updates to the most recent previous feed. Switch For you / Following or navigate to a post; the old banner should clear.
+7. Reload the page within five minutes and check recovery when the feed changes. Check a narrow window, keyboard access, long post text, and media-only posts.

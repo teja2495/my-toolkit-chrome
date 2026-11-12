@@ -8,6 +8,9 @@
     let anchor = null;
     let recovery = null;
     let host = null;
+    let popupHost = null;
+    let bannerPostId = null;
+    let feedSnapshot = [];
     let timer = null;
     let route = location.pathname + location.search;
     let tab = '';
@@ -18,12 +21,14 @@
     let pendingReload = null;
     let refreshAnchor = null;
 
-    // sessionStorage is per tab. Keep only a short-lived link, never tweet text.
+    // Short-lived, per-tab previews allow recovery across a full page reload.
     try {
         const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
         const navigation = performance.getEntriesByType('navigation')[0];
         if (navigation?.type === 'reload' && saved?.route === route &&
-            Date.now() - saved.savedAt < 5 * 60 * 1000 && validPost(saved)) {
+            Date.now() - saved.savedAt < 5 * 60 * 1000 && validPost(saved) &&
+            Array.isArray(saved.posts) && saved.posts.length > 0 && saved.posts.length <= 3 &&
+            saved.posts.every((post) => validPost(post) && typeof post.text === 'string' && typeof post.author === 'string')) {
             pendingReload = saved;
         }
     } catch (_) { /* Storage may be unavailable. Live recovery still works. */ }
@@ -66,71 +71,162 @@
         }
     }
 
+    function snapshotPosts(posts) {
+        return posts.slice(0, 3).map((post) => ({
+            id: post.id,
+            url: post.url,
+            author: '@' + new URL(post.url).pathname.split('/')[1],
+            text: Array.from(post.article.querySelectorAll('[data-testid="tweetText"]'))
+                .map((element) => element.innerText || element.textContent || '').join('\n\n').trim().slice(0, 12000),
+        }));
+    }
+
+    function updateSnapshot(posts, replace = false) {
+        const next = snapshotPosts(posts);
+        // Keep the original feed's first three posts when X virtualizes them away.
+        if (replace || !feedSnapshot.length) feedSnapshot = next;
+        else if (feedSnapshot.every((post, index) => post.id === next[index]?.id)) feedSnapshot = next;
+    }
+
     function remember(post) {
         anchor = post ? { id: post.id, url: post.url, top: post.rect.top } : null;
-        if (!anchor || savedId === anchor.id) return;
-        savedId = anchor.id;
+        saveSnapshot();
+    }
+
+    function saveSnapshot(persist = false) {
+        const signature = JSON.stringify({ anchor, posts: feedSnapshot });
+        if (!anchor || (!persist && savedId === signature)) return;
+        savedId = signature;
         try {
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...anchor, route, savedAt: Date.now() }));
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...anchor, posts: feedSnapshot, route, tab, savedAt: Date.now() }));
         } catch (_) { /* Live recovery does not require storage. */ }
     }
 
     function dismiss() {
+        closePopup();
         host?.remove();
         host = null;
         recovery = null;
+        bannerPostId = null;
     }
 
-    function showBanner(post) {
-        if (recovery) return; // Preserve the first lost post through repeated refreshes.
-        recovery = { ...post };
+    function closePopup() {
+        if (!popupHost) return;
+        popupHost.shadowRoot.querySelector('dialog').close();
+        popupHost.remove();
+        popupHost = null;
+        host?.shadowRoot.querySelector('.open')?.focus({ preventScroll: true });
+    }
+
+    function openPopup() {
+        if (!recovery?.length || popupHost) return;
+        popupHost = document.createElement('div');
+        const shadow = popupHost.attachShadow({ mode: 'open' });
+        shadow.innerHTML = `
+            <style>
+                :host { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+                dialog { box-sizing: border-box; width: min(580px, calc(100vw - 32px)); max-height: calc(100dvh - 48px);
+                    padding: 0; border: 1px solid #384b5b; border-radius: 22px; background: #101923; color: #f1f6fa;
+                    box-shadow: 0 24px 100px #0008; overflow-y: auto; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+                dialog::backdrop { background: #0009; backdrop-filter: blur(4px); }
+                header { position: sticky; top: 0; display: flex; align-items: center; gap: 16px; padding: 20px 24px;
+                    background: #101923; border-bottom: 1px solid #2a3947; z-index: 1; }
+                header > div { flex: 1; }
+                h2 { font-size: 18px; line-height: 1.3; margin: 0; flex: 1; }
+                header p { color: #94a8ba; font-size: 12px; margin: 4px 0 0; }
+                .close { flex-shrink: 0; width: 36px; height: 36px; border: 0; border-radius: 50%;
+                    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+                    background: #ffffff0c; color: inherit; cursor: pointer; }
+                .close:hover { background: #ffffff1a; }
+                .posts { padding: 0 24px; }
+                article { padding: 22px 0; border-bottom: 1px solid #2a3947; }
+                article:last-child { border-bottom: 0; }
+                .author { margin: 0 0 10px; font-weight: 650; color: #c0d2e2; }
+                .text { margin: 0 0 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+                a { color: #83cbff; text-decoration: none; overflow-wrap: anywhere; }
+                a:hover { text-decoration: underline; }
+                a:focus-visible, button:focus-visible { outline: 2px solid #83cbff; outline-offset: 4px; }
+            </style>
+            <dialog aria-labelledby="previous-posts-title">
+                <header><div><h2 id="previous-posts-title">Posts before refresh</h2>
+                    <p>The first posts from your previous feed</p></div>
+                    <button class="close" type="button" aria-label="Close previous posts"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+                <div class="posts"></div>
+            </dialog>`;
+        const list = shadow.querySelector('.posts');
+        for (const post of recovery) {
+            const article = document.createElement('article');
+            const author = document.createElement('p');
+            author.className = 'author';
+            author.textContent = post.author;
+            const text = document.createElement('p');
+            text.className = 'text';
+            text.textContent = post.text || 'This post contains media or has no text preview.';
+            const link = document.createElement('a');
+            link.href = post.url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = post.url;
+            article.append(author, text, link);
+            list.appendChild(article);
+        }
+        const dialog = shadow.querySelector('dialog');
+        shadow.querySelector('.close').addEventListener('click', closePopup);
+        dialog.addEventListener('cancel', (event) => { event.preventDefault(); closePopup(); });
+        dialog.addEventListener('click', (event) => {
+            if (event.target !== dialog) return;
+            const rect = dialog.getBoundingClientRect();
+            if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closePopup();
+        });
+        (document.body || document.documentElement).appendChild(popupHost);
+        dialog.showModal();
+    }
+
+    function mountBanner(posts) {
+        if (!host) return;
+        const first = posts.find((post) => post.id === bannerPostId);
+        if (!first || first.article.previousElementSibling === host) return;
+        // Insert into the first post's normal flow so X can measure the taller cell.
+        first.article.before(host);
+        ignoreUntil = performance.now() + 250;
+    }
+
+    function showBanner(previousPosts, posts) {
+        if (!previousPosts.length || !posts.length) return;
+        dismiss();
+        recovery = previousPosts.map((post) => ({ ...post }));
+        bannerPostId = posts[0].id;
         host = document.createElement('div');
         host.id = 'toolkit-feed-return';
         const shadow = host.attachShadow({ mode: 'open' });
         shadow.innerHTML = `
             <style>
-                :host { all: initial; position: fixed; bottom: max(28px, env(safe-area-inset-bottom));
-                    left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px);
-                    z-index: 2147483646; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme: light dark; }
-                .banner { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 20px;
-                    background: #152330; color: #f7fbff; border: 1px solid #43617a;
-                    box-shadow: 0 12px 48px #0005, 0 2px 8px #0003; animation: appear .2s ease-out; }
+                :host { all: initial; display: block; box-sizing: border-box; width: 100%; padding: 12px 16px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color-scheme: light dark; }
+                .banner { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 15px;
+                    background: #152330; color: #f7fbff; border: 1px solid #43617a; animation: appear .2s ease-out; }
                 button { font: inherit; color: inherit; border: 0; cursor: pointer; }
-                .return { display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+                .open { display: flex; flex: 1; align-items: center; gap: 12px; padding: 9px 12px;
                     border-radius: 13px; background: transparent; text-align: left; font-size: 14px; font-weight: 600; line-height: 1.4; }
-                .return:hover { background: #ffffff12; }
+                .open:hover { background: #ffffff12; }
                 .icon { color: #83cbff; flex-shrink: 0; }
-                .close { border-radius: 50%; background: transparent; font-size: 22px; width: 36px; height: 36px; flex-shrink: 0; }
+                .close { display: inline-flex; align-items: center; justify-content: center; padding: 0;
+                    border-radius: 50%; background: transparent; width: 36px; height: 36px; flex-shrink: 0; }
                 .close:hover { background: #ffffff18; }
                 button:focus-visible { outline: 2px solid #83cbff; outline-offset: 2px; }
                 @keyframes appear { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
-                @media (max-width: 600px) { :host { bottom: max(76px, env(safe-area-inset-bottom)); } }
                 @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
             </style>
             <div class="banner" role="status" aria-live="polite">
-                <button class="return" type="button">
+                <button class="open" type="button" aria-haspopup="dialog">
                     <svg class="icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5 3 11l6 6M3 11h11a6 6 0 0 1 6 6v2"/></svg>
-                    <span>Go back to the post you previously looked at</span>
+                    <span>See posts that appeared before refresh</span>
                 </button>
-                <button class="close" type="button" aria-label="Dismiss return to post banner">×</button>
+                <button class="close" type="button" aria-label="Dismiss previous posts banner"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>`;
         shadow.querySelector('.close').addEventListener('click', dismiss);
-        shadow.querySelector('.return').addEventListener('click', () => {
-            const target = recovery;
-            if (!target) return;
-            const loaded = getPosts().find((post) => post.id === target.id);
-            dismiss();
-            refreshAnchor = null;
-            ignoreUntil = performance.now() + 1200;
-            if (loaded) {
-                window.scrollBy({ top: loaded.rect.top - Math.max(90, target.top || 90), behavior: 'instant' });
-                anchor = null;
-                schedule();
-            } else if (validPost(target)) {
-                location.assign(target.url);
-            }
-        });
-        (document.body || document.documentElement).appendChild(host);
+        shadow.querySelector('.open').addEventListener('click', openPopup);
+        mountBanner(posts);
     }
 
     function check() {
@@ -146,22 +242,30 @@
                 refreshAnchor = null;
             }
             anchor = null;
+            feedSnapshot = [];
             savedId = '';
             route = nextRoute;
             tab = nextTab;
         }
-        if (document.hidden || /\/status\/\d+|^\/(?:compose|messages|settings|notifications)(?:\/|$)/.test(location.pathname)) {
+        if (document.hidden) {
+            anchor = null;
+            refreshAnchor = null;
+            return;
+        }
+        if (/\/status\/\d+|^\/(?:compose|messages|settings|notifications)(?:\/|$)/.test(location.pathname)) {
             anchor = null;
             refreshAnchor = null;
             dismiss();
             return;
         }
         const posts = getPosts();
+        mountBanner(posts);
         const current = readingPost(posts);
         // Wait through empty intermediate renders rather than forgetting the old post.
         if (!current) return;
         if (pendingReload) {
-            if (current.id !== pendingReload.id) showBanner(pendingReload);
+            if ((!pendingReload.tab || pendingReload.tab === tab) &&
+                pendingReload.posts.some((post, index) => post.id !== posts[index]?.id)) showBanner(pendingReload.posts, posts);
             pendingReload = null;
         }
         if (refreshAnchor && performance.now() > refreshAnchor.expires) refreshAnchor = null;
@@ -173,14 +277,17 @@
             const displaced = previous && current.id !== tracked.id &&
                 (previous.rect.bottom <= 80 || previous.rect.top >= innerHeight ||
                     Math.abs(previous.rect.top - tracked.top) > Math.max(120, innerHeight * 0.2));
-            lost = !previous || displaced;
+            const refreshed = refreshAnchor?.posts.some((post, index) => posts[index] && post.id !== posts[index].id);
+            lost = !previous || displaced || refreshed;
             if (lost) {
-                showBanner(tracked);
+                showBanner(refreshAnchor?.posts || feedSnapshot, posts);
                 refreshAnchor = null;
             }
         }
+        updateSnapshot(posts, lost);
         // DOM updates must not overwrite the pre-refresh position in small steps.
         if (!anchor || scrolling || lost) remember(current);
+        else saveSnapshot();
     }
 
     function schedule() {
@@ -209,15 +316,21 @@
         if (!control || location.pathname !== '/home' ||
             (control.matches('[role="tab"]') && !control.closest('[data-testid="primaryColumn"]'))) return;
         // Capture before X's click handler scrolls or replaces the timeline.
-        const post = anchor || readingPost(getPosts());
+        const posts = getPosts();
+        updateSnapshot(posts);
+        const post = anchor || readingPost(posts);
         if (!post) return;
-        refreshAnchor = { id: post.id, url: post.url, top: post.top ?? post.rect.top, expires: performance.now() + 15000 };
+        refreshAnchor = { id: post.id, url: post.url, top: post.top ?? post.rect.top,
+            posts: feedSnapshot.map((item) => ({ ...item })), expires: performance.now() + 15000 };
         ignoreUntil = 0;
         schedule();
     }, true);
     window.addEventListener('keydown', (event) => {
         if (SCROLL_KEYS.has(event.key)) onScrollIntent();
-        if (event.key === 'Escape') dismiss();
+        if (event.key === 'Escape') {
+            if (popupHost) closePopup();
+            else dismiss();
+        }
     });
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', () => { anchor = null; schedule(); }, { passive: true });
@@ -235,8 +348,7 @@
     }, 1000);
     window.addEventListener('pagehide', () => {
         if (!anchor) return;
-        savedId = '';
-        remember({ ...anchor, rect: { top: anchor.top } });
+        saveSnapshot(true);
     });
     schedule();
 })();

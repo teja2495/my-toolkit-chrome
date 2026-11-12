@@ -36,8 +36,8 @@ Configured in [custom-context-menu-actions.js](features/close-other-tabs/custom-
 ### Text Selection Popup on X (Twitter)
 [text-selection-popup.js](features/x-text-selection/text-selection-popup.js) — select text in any editable field on x.com and a small popup appears with shortcuts to send the selection to Claude/ChatGPT for rewriting or refining.
 
-### Return to a Lost Post on X (Twitter)
-[X feed return](features/x-feed-return/README.md) — when the feed suddenly moves away from the post you were reading, a banner lets you return to it. Scrolls back if it is still loaded, or opens the post directly if X removed it from the feed.
+### Posts Before Refresh on X (Twitter)
+[X feed return](features/x-feed-return/README.md) — after the feed refreshes, a banner above the first new tweet opens a popup with text and links for the previous feed's first three posts.
 
 ### YouTube Tweaks
 
