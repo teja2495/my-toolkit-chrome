@@ -305,12 +305,12 @@
     }, { passive: true });
     window.addEventListener('pointerup', () => { scrollbarDragging = false; }, { passive: true });
     document.addEventListener('click', (event) => {
-        const control = event.target instanceof Element ? event.target.closest('a[href="/home"], [role="tab"], button, [role="button"]') : null;
+        const control = event.target instanceof Element ? event.target.closest('a, [role="tab"], button, [role="button"]') : null;
         if (!control) return;
         const home = control.matches('a[href="/home"]');
         const inTimeline = !!control.closest('[data-testid="primaryColumn"]');
         const timelineRefresh = inTimeline && (control.matches('[role="tab"]') ||
-            /^(?:see|show)(?:\s+\d+)?\s+new\s+(?:posts|tweets)$/i.test(control.textContent.trim()));
+            /^(?:see|show)\s+(?:[\d,]+\s+(?:new\s+)?|new\s+)(?:posts?|tweets?)$/i.test((control.innerText || control.textContent).trim()));
         if (home || timelineRefresh) suppressManualRefresh();
     }, true);
     window.addEventListener('keydown', (event) => {
