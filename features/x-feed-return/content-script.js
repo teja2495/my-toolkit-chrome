@@ -2,7 +2,6 @@
     if (window.__toolkitFeedReturnLoaded) return;
     window.__toolkitFeedReturnLoaded = true;
 
-    const STORAGE_KEY = 'xFeedReturn.readingPost';
     const TWEET_SELECTOR = 'article[data-testid="tweet"]';
     const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
     let anchor = null;
@@ -17,20 +16,11 @@
     let ignoreUntil = 0;
     let touching = false;
     let scrollbarDragging = false;
-    let savedId = '';
-    let pendingReload = null;
-    let refreshAnchor = null;
+    let manualRefresh = null;
 
-    // Short-lived, per-tab previews allow recovery across a full page reload.
+    // Previews now live only in memory; a page reload starts a fresh feed.
     try {
-        const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
-        const navigation = performance.getEntriesByType('navigation')[0];
-        if (navigation?.type === 'reload' && saved?.route === route &&
-            Date.now() - saved.savedAt < 5 * 60 * 1000 && validPost(saved) &&
-            Array.isArray(saved.posts) && saved.posts.length > 0 && saved.posts.length <= 3 &&
-            saved.posts.every((post) => validPost(post) && typeof post.text === 'string' && typeof post.author === 'string')) {
-            pendingReload = saved;
-        }
+        sessionStorage.removeItem('xFeedReturn.readingPost');
     } catch (_) { /* Storage may be unavailable. Live recovery still works. */ }
 
     function validPost(post) {
@@ -55,7 +45,7 @@
             const url = new URL(link.href, location.origin);
             url.pathname = url.pathname.replace(/\/analytics$/, '');
             const match = url.pathname.match(/^\/[^/]+\/status\/(\d+)$/);
-            if (!match) return [];
+            if (!match || !validPost({ id: match[1], url: url.origin + url.pathname })) return [];
             return [{ id: match[1], url: url.origin + url.pathname, article, rect: article.getBoundingClientRect() }];
         });
     }
@@ -90,16 +80,6 @@
 
     function remember(post) {
         anchor = post ? { id: post.id, url: post.url, top: post.rect.top } : null;
-        saveSnapshot();
-    }
-
-    function saveSnapshot(persist = false) {
-        const signature = JSON.stringify({ anchor, posts: feedSnapshot });
-        if (!anchor || (!persist && savedId === signature)) return;
-        savedId = signature;
-        try {
-            sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...anchor, posts: feedSnapshot, route, tab, savedAt: Date.now() }));
-        } catch (_) { /* Live recovery does not require storage. */ }
     }
 
     function dismiss() {
@@ -237,24 +217,20 @@
         if (nextRoute !== route || nextTab !== tab) {
             // Switching timeline tabs is intentional, not a lost reading position.
             if (nextRoute !== route || tab) {
-                dismiss();
-                pendingReload = null;
-                refreshAnchor = null;
+                if (!manualRefresh) suppressManualRefresh();
+                else dismiss();
             }
             anchor = null;
             feedSnapshot = [];
-            savedId = '';
             route = nextRoute;
             tab = nextTab;
         }
         if (document.hidden) {
             anchor = null;
-            refreshAnchor = null;
             return;
         }
         if (/\/status\/\d+|^\/(?:compose|messages|settings|notifications)(?:\/|$)/.test(location.pathname)) {
             anchor = null;
-            refreshAnchor = null;
             dismiss();
             return;
         }
@@ -263,31 +239,38 @@
         const current = readingPost(posts);
         // Wait through empty intermediate renders rather than forgetting the old post.
         if (!current) return;
-        if (pendingReload) {
-            if ((!pendingReload.tab || pendingReload.tab === tab) &&
-                pendingReload.posts.some((post, index) => post.id !== posts[index]?.id)) showBanner(pendingReload.posts, posts);
-            pendingReload = null;
+        if (manualRefresh) {
+            const now = performance.now();
+            if (now >= manualRefresh.expires || (manualRefresh.changed && now >= manualRefresh.quietUntil)) {
+                manualRefresh = null;
+            } else {
+                const head = posts.slice(0, 3).map((post) => post.id).join(',');
+                if (head !== manualRefresh.head) {
+                    manualRefresh.head = head;
+                    manualRefresh.changed = true;
+                    manualRefresh.quietUntil = now + 1500;
+                }
+                updateSnapshot(posts, true);
+                remember(current);
+                return;
+            }
         }
-        if (refreshAnchor && performance.now() > refreshAnchor.expires) refreshAnchor = null;
-        const tracked = refreshAnchor || anchor;
+        const tracked = anchor;
         const scrolling = touching || scrollbarDragging || performance.now() <= ignoreUntil;
         let lost = false;
-        if (tracked && (!scrolling || refreshAnchor)) {
+        if (tracked && !scrolling) {
             const previous = posts.find((post) => post.id === tracked.id);
             const displaced = previous && current.id !== tracked.id &&
                 (previous.rect.bottom <= 80 || previous.rect.top >= innerHeight ||
                     Math.abs(previous.rect.top - tracked.top) > Math.max(120, innerHeight * 0.2));
-            const refreshed = refreshAnchor?.posts.some((post, index) => posts[index] && post.id !== posts[index].id);
-            lost = !previous || displaced || refreshed;
+            lost = !previous || displaced;
             if (lost) {
-                showBanner(refreshAnchor?.posts || feedSnapshot, posts);
-                refreshAnchor = null;
+                showBanner(feedSnapshot, posts);
             }
         }
         updateSnapshot(posts, lost);
         // DOM updates must not overwrite the pre-refresh position in small steps.
         if (!anchor || scrolling || lost) remember(current);
-        else saveSnapshot();
     }
 
     function schedule() {
@@ -296,8 +279,18 @@
     }
 
     function onScrollIntent() {
-        refreshAnchor = null;
         ignoreUntil = performance.now() + 1000;
+        schedule();
+    }
+
+    function suppressManualRefresh() {
+        dismiss();
+        manualRefresh = {
+            head: getPosts().slice(0, 3).map((post) => post.id).join(','),
+            changed: false, quietUntil: 0, expires: performance.now() + 15000,
+        };
+        anchor = null;
+        feedSnapshot = [];
         schedule();
     }
 
@@ -307,23 +300,18 @@
     window.addEventListener('touchcancel', () => { touching = false; onScrollIntent(); }, { passive: true });
     window.addEventListener('pointerdown', (event) => {
         scrollbarDragging = event.clientX >= document.documentElement.clientWidth;
-        // Ordinary clicks (including Home's feed refresh) do not indicate scrolling.
+        // Only scrollbar dragging and middle-click autoscroll imply scrolling.
         if (scrollbarDragging || event.button === 1) onScrollIntent();
     }, { passive: true });
     window.addEventListener('pointerup', () => { scrollbarDragging = false; }, { passive: true });
     document.addEventListener('click', (event) => {
-        const control = event.target instanceof Element ? event.target.closest('a[href="/home"], [role="tab"][aria-selected="true"]') : null;
-        if (!control || location.pathname !== '/home' ||
-            (control.matches('[role="tab"]') && !control.closest('[data-testid="primaryColumn"]'))) return;
-        // Capture before X's click handler scrolls or replaces the timeline.
-        const posts = getPosts();
-        updateSnapshot(posts);
-        const post = anchor || readingPost(posts);
-        if (!post) return;
-        refreshAnchor = { id: post.id, url: post.url, top: post.top ?? post.rect.top,
-            posts: feedSnapshot.map((item) => ({ ...item })), expires: performance.now() + 15000 };
-        ignoreUntil = 0;
-        schedule();
+        const control = event.target instanceof Element ? event.target.closest('a[href="/home"], [role="tab"], button, [role="button"]') : null;
+        if (!control) return;
+        const home = control.matches('a[href="/home"]');
+        const inTimeline = !!control.closest('[data-testid="primaryColumn"]');
+        const timelineRefresh = inTimeline && (control.matches('[role="tab"]') ||
+            /^(?:see|show)(?:\s+\d+)?\s+new\s+(?:posts|tweets)$/i.test(control.textContent.trim()));
+        if (home || timelineRefresh) suppressManualRefresh();
     }, true);
     window.addEventListener('keydown', (event) => {
         if (SCROLL_KEYS.has(event.key)) onScrollIntent();
@@ -346,9 +334,5 @@
     setInterval(() => {
         if (location.pathname + location.search !== route) schedule();
     }, 1000);
-    window.addEventListener('pagehide', () => {
-        if (!anchor) return;
-        saveSnapshot(true);
-    });
     schedule();
 })();

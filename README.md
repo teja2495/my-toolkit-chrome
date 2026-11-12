@@ -37,7 +37,7 @@ Configured in [custom-context-menu-actions.js](features/close-other-tabs/custom-
 [text-selection-popup.js](features/x-text-selection/text-selection-popup.js) — select text in any editable field on x.com and a small popup appears with shortcuts to send the selection to Claude/ChatGPT for rewriting or refining.
 
 ### Posts Before Refresh on X (Twitter)
-[X feed return](features/x-feed-return/README.md) — after the feed refreshes, a banner above the first new tweet opens a popup with text and links for the previous feed's first three posts.
+[X feed return](features/x-feed-return/README.md) — after the feed refreshes automatically, a banner above the first new tweet opens a popup with text and links for the previous feed's first three posts. Manual refreshes stay quiet.
 
 ### YouTube Tweaks
 
