@@ -43,7 +43,7 @@ Configured in [custom-context-menu-actions.js](features/close-other-tabs/custom-
 
 - **Player Watch Later button** ([youtube-player-buttons.js](features/youtube/youtube-player-buttons.js)) — adds a Watch Later button directly to the video player controls.
 - **Auto-press `t` on watch pages** ([youtube-watch-t-keypress.js](features/youtube/youtube-watch-t-keypress.js)) — toggles theater mode automatically when a video loads.
-- **Playlist quick-add buttons** ([youtube-playlist-buttons.js](features/youtube/youtube-playlist-buttons.js)) — quick add/remove from Watch Later on playlist pages.
+- **Playlist quick-add buttons** ([youtube-playlist-buttons.js](features/youtube/youtube-playlist-buttons.js)) — quick add/remove from Watch Later on playlist pages, and automatically removes deleted/private videos from Watch later.
 - **Homepage "Watch Later on title click"** ([youtube-homepage-watch-later.js](features/youtube/youtube-homepage-watch-later.js)) — adds videos to Watch Later when you click on the video title in homepage.
 - **YouTube Music playlist filtering** ([yt-music-playlist-filtering.js](features/youtube/yt-music-playlist-filtering.js)) — hides specific playlists I don't want cluttering my library (edit the `PLAYLISTS_TO_HIDE` list to customize).
 
